@@ -7,15 +7,33 @@ router.get('/',(req, res)=>{ //Define una ruta.
     const {id_club}=req.query;//Lee parametros de la query.
 
     if (id_club) {
-        
-        const sql = 'SELECT * FROM teams WHERE id_club = ?';
+        //vemos si el club existe.
+        const clubSql = 'SELECT id_club FROM club WHERE id_club = ?';
 
-        db.query(sql, [id_club], (err, results) => {
+        db.query(clubSql, [id_club], (err, clubResult) => {
             if (err) {
                 console.error(err);
                 return res.status(500).json({ error: 'Database error' });
             }
-            res.json(results);
+
+            // 2️⃣ Si el club no existe
+            if (clubResult.length === 0) {
+                return res.status(404).json({
+                    error: 'Club not found'
+                });
+            }
+
+            // 3️⃣ Si existe, buscar equipos
+            const teamsSql = 'SELECT * FROM teams WHERE id_club = ?';
+
+            db.query(teamsSql, [id_club], (err, teamsResult) => {
+                if (err) {
+                    console.error(err);
+                    return res.status(500).json({ error: 'Database error' });
+                }
+
+                res.json(teamsResult);
+            });
         });
 
     } else {
