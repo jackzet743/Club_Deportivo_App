@@ -4,6 +4,7 @@ const clubsRoutes = require('./routes/clubs');
 const teamsRoutes = require('./routes/teams');
 const usersRoutes = require('./routes/users');
 const usersRolRoutes = require('./routes/usersRol');
+const usersTeamsRoutes= require('./routes/usersTeams');
 
 const app = express(); //Convierte esto en mi servidor. Cuelga de la constante APP.
 const PORT = 3000;//Puerto donde se escucha el servidor.
@@ -13,6 +14,7 @@ app.use('/clubs', clubsRoutes); //Permite usar el router de clubs.
 app.use('/teams', teamsRoutes); //Permite usar el router de teams.
 app.use('/users', usersRoutes);
 app.use('/user_Rol', usersRolRoutes);
+app.use('/user_team', usersTeamsRoutes);
 
 //Genera una respuesta a una petición y respuesta.
 app.get('/', (req, res) => {
