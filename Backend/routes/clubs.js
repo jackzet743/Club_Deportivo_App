@@ -57,4 +57,33 @@ router.post('/', async (req, res)=>{ //Usamos funciones asincronas para poder ha
 });
 
 
+router.get('/', async( req, res)=>{ //hacer petición get con el async para los awaits de las peticiones.
+    try{
+        //Rows es una array de objetos, cada uno es un club
+        const [rows] = await db.promise().query('SELECT c.id_club,c.name_club,c.city,c.postal_code,c.discipline,cc.telef,cc.email FROM club c LEFT JOIN club_contact cc ON c.id_club = cc.id_club;');
+
+        //devuelve todo de forma limpia.
+        const clubs = rows.map(row =>({
+            id_club: row.id_club,
+            name_club: row.name_club,
+            city: row.city,
+            postal_code: row.postal_code,
+            discipline: row.discipline,
+            contact: {
+                telef: row.telef,
+                email: row.email
+            }
+        }));
+        //Devuelve la respuesta de la base de datos sin exponerlo. En forma de json.
+        res.json(clubs);
+    }catch{
+        console.error(error);
+        res.status(500).json({
+            error: 'Error fetching clubs'
+    });
+    }
+})
+
+
+
 module.exports = router; //Se puede exportar a otros archivos.
