@@ -9,6 +9,16 @@ create table club (
     discipline varchar(100) not null
 );
 
+ALTER TABLE teams
+DROP FOREIGN KEY teams_ibfk_1;
+
+ALTER TABLE teams
+ADD CONSTRAINT fk_teams_club
+FOREIGN KEY (id_club)
+REFERENCES club(id_club)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+
 create table club_contact (
 	id_club int primary key,
 	telef varchar(15) not null,
@@ -19,6 +29,15 @@ ALTER TABLE club_contact
 ADD UNIQUE (email),
 add unique (telef);
 
+ALTER TABLE club_contact
+DROP FOREIGN KEY club_contact_ibfk_1;
+
+ALTER TABLE club_contact
+ADD CONSTRAINT fk_contact_club
+FOREIGN KEY (id_club)
+REFERENCES club(id_club)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
 
 create table teams (
 	id_team int primary key auto_increment,
@@ -50,6 +69,30 @@ add unique (DNI);
 ALTER TABLE users
 ADD COLUMN fecha_nacimiento DATE not null;
 
+alter table users
+rename column fecha_nacimiento to birth_date;
+
+ALTER TABLE users
+DROP FOREIGN KEY users_ibfk_1;
+
+ALTER TABLE users
+ADD CONSTRAINT fk_users_club
+FOREIGN KEY (id_club)
+REFERENCES club(id_club)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+
+ALTER TABLE users
+DROP FOREIGN KEY users_ibfk_2;
+
+ALTER TABLE users
+ADD CONSTRAINT fk_users_socio
+FOREIGN KEY (id_socio)
+REFERENCES users(id_user)
+ON DELETE SET NULL
+ON UPDATE CASCADE;
+
+
 create table rol (
 	id_rol int primary key auto_increment,
     rol varchar(20) not null
@@ -65,6 +108,17 @@ create table user_rol (
     foreign key (id_rol) references rol (id_rol)
 );
 
+ALTER TABLE user_rol
+add primary key (id_user , id_rol);
+
+ALTER TABLE user_rol
+ADD CONSTRAINT fk_userrol_user
+FOREIGN KEY (id_user)
+REFERENCES users(id_user)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+
+
 
 create table user_team (
 	id_user INT NOT NULL,
@@ -78,6 +132,27 @@ create table user_team (
 ALTER TABLE user_team
 ADD CONSTRAINT uq_team_user UNIQUE (id_team, id_user);
 
+ALTER TABLE user_team
+DROP FOREIGN KEY user_team_ibfk_2;
+
+ALTER TABLE user_team
+ADD CONSTRAINT fk_userteam_team
+FOREIGN KEY (id_team)
+REFERENCES teams(id_team)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+
+ALTER TABLE user_team
+DROP FOREIGN KEY user_team_ibfk_1;
+
+ALTER TABLE user_team
+ADD CONSTRAINT fk_userteam_user
+FOREIGN KEY (id_user)
+REFERENCES users(id_user)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+
+
 CREATE TABLE matches (
     id_match INT PRIMARY KEY AUTO_INCREMENT,
     id_team INT NOT NULL,      
@@ -88,3 +163,20 @@ CREATE TABLE matches (
     CONSTRAINT fk_match_team
 	FOREIGN KEY (id_team) REFERENCES teams(id_team)
 );
+
+ALTER TABLE matches
+DROP FOREIGN KEY fk_match_team;
+
+ALTER TABLE matches
+ADD CONSTRAINT fk_matches_team
+FOREIGN KEY (id_team)
+REFERENCES teams(id_team)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+
+SHOW CREATE TABLE teams;
+SHOW CREATE TABLE users;
+SHOW CREATE TABLE user_team;
+SHOW CREATE TABLE matches;
+
+select * from user_rol;
