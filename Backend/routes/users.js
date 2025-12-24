@@ -85,9 +85,110 @@ router.post('/', async(req, res) =>{
     }
 })
 
-router.get('/',(req,res)=>{
-    const {id_club}=req.query; //Leer la query.
+router.get('/', (req, res) => {
+    const { club, team, role } = req.query; // Leer los parámetros
 
+    let sql = `
+        SELECT
+            u.id_user,
+            u.user_name,
+            u.surename1,
+            u.surename2,
+            u.email,
+            u.id_club,
+            r.rol AS global_role,
+            t.id_team,
+            t.category AS team_category,
+            rt.rol AS team_role
+        FROM users u
+        LEFT JOIN user_rol ur ON u.id_user = ur.id_user
+        LEFT JOIN rol r ON ur.id_rol = r.id_rol
+        LEFT JOIN user_team ut ON u.id_user = ut.id_user
+        LEFT JOIN teams t ON ut.id_team = t.id_team
+        LEFT JOIN rol rt ON ut.id_rol = rt.id_rol
+        WHERE 1=1
+    `;
+
+    const params = [];
+
+    // Filtro por club
+    if (club) {
+        sql += ' AND u.id_club = ?';
+        params.push(club);
+    }
+
+    // Filtro por equipo
+    if (team) {
+        sql += ' AND t.id_team = ?';
+        params.push(team);
+    }
+
+    // Filtro por rol
+    if (role) {
+        sql += `
+            AND (
+                r.rol = ? OR (rt.rol = ? AND t.id_club = u.id_club)
+            )
+        `;
+        params.push(role, role);
+    }
+
+    db.query(sql, params, (err, rows) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        const usersMap = {};
+
+        rows.forEach(row => {
+            if (!usersMap[row.id_user]) {
+                usersMap[row.id_user] = {
+                    id_user: row.id_user,
+                    user_name: row.user_name,
+                    surename1: row.surename1,
+                    surename2: row.surename2,
+                    email: row.email,
+                    id_club: row.id_club,
+                    global_roles: [],
+                    teams: []
+                };
+            }
+
+            // Solo agregar global_role si coincide con el filtro de rol (si se pasó)
+            if (row.global_role && (!role || row.global_role === role)) {
+                if (!usersMap[row.id_user].global_roles.includes(row.global_role)) {
+                    usersMap[row.id_user].global_roles.push(row.global_role);
+                }
+            }
+
+            // Solo agregar equipos si coincide con filtro de rol (si se pasó)
+            if (row.id_team && (!role || row.team_role === role)) {
+                const exists = usersMap[row.id_user].teams.some(t => t.id_team === row.id_team);
+                if (!exists) {
+                    usersMap[row.id_user].teams.push({
+                        id_team: row.id_team,
+                        category: row.team_category,
+                        role: row.team_role
+                    });
+                }
+            }
+        });
+
+        // Eliminar usuarios que no tengan roles ni equipos cuando se filtró por rol
+        let users = Object.values(usersMap);
+        if (role) {
+            users = users.filter(u => u.global_roles.length > 0 || u.teams.length > 0);
+        }
+
+        res.json(users);
+    });
+});
+
+module.exports = router;
+
+
+    /*
     if (id_club) {
         //vemos si el club existe.
         const clubSql = 'SELECT id_club FROM club WHERE id_club = ?';
@@ -153,7 +254,9 @@ router.get('/',(req,res)=>{
                 res.json(usersResult);
         });
     }
+        
 });
+module.exports= router;*/
 
 
-module.exports= router;
+
