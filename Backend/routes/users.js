@@ -69,7 +69,7 @@ router.post('/', async(req, res) =>{
         })
 
 
-    }catch{
+    }catch(error){
         console.error(error);
 
         //Errores con UNIQUE

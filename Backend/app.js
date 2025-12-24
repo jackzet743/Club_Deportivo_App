@@ -5,6 +5,7 @@ const teamsRoutes = require('./routes/teams');
 const usersRoutes = require('./routes/users');
 const usersRolRoutes = require('./routes/usersRol');
 const usersTeamsRoutes= require('./routes/usersTeams');
+const authRoutes = require('./routes/auth');
 
 const app = express(); //Convierte esto en mi servidor. Cuelga de la constante APP.
 const PORT = 3000;//Puerto donde se escucha el servidor.
@@ -15,6 +16,7 @@ app.use('/teams', teamsRoutes); //Permite usar el router de teams.
 app.use('/users', usersRoutes);
 app.use('/user_Rol', usersRolRoutes);
 app.use('/user_team', usersTeamsRoutes);
+app.use('/auth', authRoutes);
 
 //Genera una respuesta a una petición y respuesta.
 app.get('/', (req, res) => {
