@@ -46,12 +46,22 @@ router.post('/login', (req, res)=>{
                 error: 'Invalid credentials'
             });
         }
+        const roleSql = `
+            SELECT r.rol
+            FROM user_rol ur
+            JOIN rol r ON ur.id_rol = r.id_rol
+            WHERE ur.id_user = ?
+            `;
+
+        const [roles] = await db.promise().query(roleSql, [user.id_user]);
+
 
         //Crear token
         const token = jwt.sign(
             {
                 id_user: user.id_user,
-                email: user.email
+                email: user.email,
+                roles: roles.map(r => r.rol)
             },
             jwtConfig.secret,
             { expiresIn: jwtConfig.expiresIn }
