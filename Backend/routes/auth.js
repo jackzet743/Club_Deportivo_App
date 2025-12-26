@@ -61,6 +61,7 @@ router.post('/login', (req, res)=>{
             {
                 id_user: user.id_user,
                 email: user.email,
+                id_club: user.id_club,
                 roles: roles.map(r => r.rol)
             },
             jwtConfig.secret,

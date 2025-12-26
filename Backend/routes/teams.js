@@ -1,7 +1,8 @@
 const express = require('express'); //Importación de libreria.
 const router = express.Router(); //Es un miniservidor para las rutas relacionadas con teams.
 const db = require('../config/db'); //  Importa la conexion con la base de datos.
-const auth= require('../middleware/auth');
+const auth = require('../middleware/auth');
+const role = require('../middleware/role');
 
 router.get('/',auth,(req,res)=>{
 
@@ -83,27 +84,43 @@ router.get('/',auth,(req,res)=>{
 
 });
 
-router.post('/', async(req, res)=>{
-    const{id_club, category}=req.body; //coge los datos del cliente
-
-    if(!id_club || !category){
-        return res.status(400).json({ //Control de que se pongan los datos
-            error: 'id_club and category required'
+router.post('/', auth, role(['directivo']), async(req, res)=>{ //se pide autentificarse y que el token the identificación tenga el rol de directivo para poder crear equipos.
+    const {category} = req.body;
+    const id_user = req.user.id_user; //Le pedimos a la base de datos a la base de datos, no al usuario 
+    if(!category){
+        return res.status(400).json({
+        error: "Category is required"
         });
     }
 
     try{//Consulta
-        const [result]= await db.promise().query(` 
-            INSERT INTO teams (id_club, category)
-            VALUES (?, ?)`, [id_club, category]
+
+        const [users] = await db.promise().query(
+            'SELECT id_club FROM users WHERE id_user = ?',
+            [id_user]
         );
+
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+
+        const id_club= users[0].id_club;
+
+        const sql=`
+        INSERT INTO teams (id_club, category)
+        VALUES (?, ?)`;
+
+
+        const [result]= await db.promise().query(sql, [id_club, category]);
+        
         //Respuesta por el servidor
         res.status(201).json({
             message: "Team created succesfully",
             id_team: result.insertId
         });
 
-    }catch{
+    }catch(error){
         console.error(error);
 
         if(error.code === 'ER_NO_REFERENCES_ROW_2'){
