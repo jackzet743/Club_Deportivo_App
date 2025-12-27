@@ -4,85 +4,86 @@ const db = require('../config/db'); //  Importa la conexion con la base de datos
 const auth = require('../middleware/auth');
 const role = require('../middleware/role');
 
-router.get('/',auth,(req,res)=>{
-
-    const {club, team } = req.query;
+router.get('/', auth, (req, res) => {
+    const { club } = req.query;
 
     let sql = `
-        SELECT
-            t.id_team,
-            t.category,
-            t.id_club,
-
-            u.id_user,
-            u.user_name,
-            u.surename1,
-
-            r.rol AS team_role
-
-        FROM teams t
-        LEFT JOIN user_team ut ON t.id_team = ut.id_team
-        LEFT JOIN users u ON ut.id_user = u.id_user
-        LEFT JOIN rol r ON ut.id_rol = r.id_rol
+        SELECT id_team, category, id_club
+        FROM teams
     `;
 
-    const conditions = [];
     const params = [];
 
-
-    if(club){
-        conditions.push(' t.id_club=?');
+    if (club) {
+        sql += ' WHERE id_club = ?';
         params.push(club);
     }
 
-    if(team){
-        conditions.push( ' t.id_team = ?');
-        params.push(team);
-    }
-
-    if(conditions.length >0 ){
-        sql += ` WHERE ` + conditions.join(' AND ');
-    }
-
-    db.query(sql,params,(err,rows)=>{
-        if(err){
+    db.query(sql, params, (err, rows) => {
+        if (err) {
             console.error(err);
-            return res.status(500).json ({error:'Error Database'});
+            return res.status(500).json({ error: 'Database error' });
         }
 
-        if (team && rows.length === 0) {
-            return res.status(404).json({
-            error: 'Team not found'
-            });
-        }
-
-        const teamsMap = {};
-
-        rows.forEach(row =>{
-            // Crear equipo si no existe
-            if (!teamsMap[row.id_team]) {
-                teamsMap[row.id_team] = {
-                    id_team: row.id_team,
-                    category: row.category,
-                    id_club: row.id_club,
-                    users: []
-                };
-            }
-
-            // Añadir usuario si existe
-            if (row.id_user) {
-                teamsMap[row.id_team].users.push({
-                    id_user: row.id_user,
-                    user_name: row.user_name,
-                    surename1: row.surename1,
-                    role: row.team_role
-                });
-            }
-        });
-        res.json(Object.values(teamsMap));
+        res.json(rows);
     });
-
 });
+
+router.get('/:id/users', auth, async (req, res) => {
+    const id_team = req.params.id;
+
+    try {
+    // 1️⃣ Obtener equipo
+    const [team] = await db.promise().query(
+        'SELECT id_team, category, id_club FROM teams WHERE id_team = ?',
+        [id_team]
+    );
+
+    if (team.length === 0) {
+        return res.status(404).json({ error: 'Team not found' });
+    }
+
+    // 2️⃣ Obtener club del usuario autenticado
+    const [userClub] = await db.promise().query(
+        'SELECT id_club FROM users WHERE id_user = ?',
+        [req.user.id_user]
+    );
+
+    if (team[0].id_club !== userClub[0].id_club) {
+        return res.status(403).json({
+            error: 'Access denied to this team'
+        });
+    }
+
+    // 3️⃣ Obtener usuarios del equipo con roles
+    const [users] = await db.promise().query(
+        `
+        SELECT 
+            u.id_user,
+            CONCAT(u.user_name, ' ', u.surename1) AS name,
+            r.rol
+        FROM user_team ut
+        JOIN users u ON ut.id_user = u.id_user
+        JOIN rol r ON ut.id_rol = r.id_rol
+        WHERE ut.id_team = ?
+        `,
+        [id_team]
+    );
+
+    res.json({
+        team: {
+            id_team: team[0].id_team,
+            category: team[0].category
+        },
+        users
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 
 router.post('/', auth, role(['directivo']), async(req, res)=>{ //se pide autentificarse y que el token the identificación tenga el rol de directivo para poder crear equipos.
     const {category} = req.body;
