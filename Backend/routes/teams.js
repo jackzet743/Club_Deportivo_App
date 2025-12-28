@@ -3,6 +3,7 @@ const router = express.Router(); //Es un miniservidor para las rutas relacionada
 const db = require('../config/db'); //  Importa la conexion con la base de datos.
 const auth = require('../middleware/auth');
 const role = require('../middleware/role');
+const canAccessTeam = require('../middleware/canAccessTeam');
 
 router.get('/', auth, (req, res) => {
     const { club } = req.query;
@@ -28,57 +29,10 @@ router.get('/', auth, (req, res) => {
         res.json(rows);
     });
 });
+//GET Only trainers and directives can access to teams views, trainers limited at their own.
+router.get('/:id/users', auth,role([`directivo`,`entrenador`]), canAccessTeam, async (req, res) => {
 
-router.get('/:id/users', auth,role([`directivo`,`entrenador`]), async (req, res) => {
     const id_team = req.params.id;
-    const userId = req.user.id_user;
-    const roles = req.user.roles;
-
-    try {
-
-    const [teamRows] = await db.promise().query(
-        'SELECT id_team, category, id_club FROM teams WHERE id_team = ?',
-        [id_team]
-    );
-
-    if (teamRows.length === 0) {
-        return res.status(404).json({ error: 'Team not found' });
-    }
-
-    const team = teamRows[0];
-
-    if(roles.includes('directivo')){
-
-        const [userClub] = await db.promise().query(
-            'SELECT id_club FROM users WHERE id_user = ?',
-            [userId]
-        );
-
-        if(userClub.length ===0 || userClub[0].id_club !== team.id_club){
-            return res.status(403).json({
-                error: 'Access denied to this team'
-            });
-        }
-    }
-
-    if(roles.includes('entrenador')){
-        const [assigned] = await db.promise().query(`
-            SELECT 1
-            FROM user_team ut
-            JOIN rol r ON ut.id_rol = r.id_rol
-            WHERE ut.id_user = ?
-                AND ut.id_team = ?
-                AND r.rol = 'entrenador'`,
-            [userId, id_team]
-        );
-        
-        if( assigned.length === 0){
-            return res.status(403).json({
-                error: 'Access denied to this team'
-            });
-        }
-    }
-    
     
     const [users] = await db.promise().query(
         `
@@ -100,12 +54,7 @@ router.get('/:id/users', auth,role([`directivo`,`entrenador`]), async (req, res)
             category: team.category
         },
         users
-        });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-    }
+    });
 });
 
 
