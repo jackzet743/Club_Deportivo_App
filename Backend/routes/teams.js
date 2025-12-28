@@ -29,33 +29,57 @@ router.get('/', auth, (req, res) => {
     });
 });
 
-router.get('/:id/users', auth, async (req, res) => {
+router.get('/:id/users', auth,role([`directivo`,`entrenador`]), async (req, res) => {
     const id_team = req.params.id;
+    const userId = req.user.id_user;
+    const roles = req.user.roles;
 
     try {
-    // 1️⃣ Obtener equipo
-    const [team] = await db.promise().query(
+
+    const [teamRows] = await db.promise().query(
         'SELECT id_team, category, id_club FROM teams WHERE id_team = ?',
         [id_team]
     );
 
-    if (team.length === 0) {
+    if (teamRows.length === 0) {
         return res.status(404).json({ error: 'Team not found' });
     }
 
-    // 2️⃣ Obtener club del usuario autenticado
-    const [userClub] = await db.promise().query(
-        'SELECT id_club FROM users WHERE id_user = ?',
-        [req.user.id_user]
-    );
+    const team = teamRows[0];
 
-    if (team[0].id_club !== userClub[0].id_club) {
-        return res.status(403).json({
-            error: 'Access denied to this team'
-        });
+    if(roles.includes('directivo')){
+
+        const [userClub] = await db.promise().query(
+            'SELECT id_club FROM users WHERE id_user = ?',
+            [userId]
+        );
+
+        if(userClub.length ===0 || userClub[0].id_club !== team.id_club){
+            return res.status(403).json({
+                error: 'Access denied to this team'
+            });
+        }
     }
 
-    // 3️⃣ Obtener usuarios del equipo con roles
+    if(roles.includes('entrenador')){
+        const [assigned] = await db.promise().query(`
+            SELECT 1
+            FROM user_team ut
+            JOIN rol r ON ut.id_rol = r.id_rol
+            WHERE ut.id_user = ?
+                AND ut.id_team = ?
+                AND r.rol = 'entrenador'`,
+            [userId, id_team]
+        );
+        
+        if( assigned.length === 0){
+            return res.status(403).json({
+                error: 'Access denied to this team'
+            });
+        }
+    }
+    
+    
     const [users] = await db.promise().query(
         `
         SELECT 
@@ -72,8 +96,8 @@ router.get('/:id/users', auth, async (req, res) => {
 
     res.json({
         team: {
-            id_team: team[0].id_team,
-            category: team[0].category
+            id_team: team.id_team,
+            category: team.category
         },
         users
         });
