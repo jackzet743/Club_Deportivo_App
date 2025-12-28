@@ -2,7 +2,7 @@ const db = require('../config/db');
 
 module.exports = async (req,res, next) =>{
     const id_team = req.params.id;
-    const userId = req.params.id_user;
+    const userId = req.user.id_user;
     const roles = req.user.roles;
 
     try{

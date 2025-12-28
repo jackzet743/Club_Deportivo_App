@@ -50,8 +50,8 @@ router.get('/:id/users', auth,role([`directivo`,`entrenador`]), canAccessTeam, a
 
     res.json({
         team: {
-            id_team: team.id_team,
-            category: team.category
+            id_team: req.team.id_team,
+            category: req.team.category
         },
         users
     });
