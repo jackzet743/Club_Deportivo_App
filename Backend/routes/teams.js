@@ -110,6 +110,52 @@ router.post('/', auth, role(['directivo']), async(req, res)=>{ //se pide autenti
 
 })
 
+//Hacemos el la peticion para delete.
+router.delete(
+    '/:id/users/:id_user',
+    auth, role(['directivo', 'entrenador']),
+    canAccessTeam,
+    async (req, res)=>{
+
+        const id_team = req.params.id;
+        const id_user = req.params.id_user;
+
+        try{
+            //Comprobar que la relación existe.
+            const [rows] = await db.promise().query(
+                `
+                Select 1
+                From user_team
+                Where id_team = ? AND id_user = ?`,
+                [id_team, id_user]
+            );
+
+            if(rows.length === 0){
+                return res.status(404).json({
+                    error: "User not assigned to this team"
+                });
+            }
+
+            //Borrar relación.
+            await db.promise().query(
+                `Delete from user_team
+                Where id_team = ? and id_user = ?`,
+                [id_team, id_user]
+            );
+            
+            res.json({
+                message: 'User removed from team successfully'
+            });
+
+        }catch(error){
+            console.error(error);
+            res.status(500).json({error: `Server error`});
+
+        }
+    }
+)
+
+
 module.exports = router; //Se puede exportar a otros archivos.
 
 
