@@ -39,7 +39,9 @@ app.use('/auth', authRoutes); // /auth/...
 
 // RUTA RAÍZ
 app.get('/', (req, res) => {
+
     res.send('Backend running');
+
 });
 
 // =================================================
@@ -47,5 +49,7 @@ app.get('/', (req, res) => {
 // =================================================
 
 app.listen(PORT, () => {
+
     console.log(`Server running on http://localhost:${PORT}`);
+    
 });
