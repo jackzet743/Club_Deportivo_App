@@ -1,9 +1,19 @@
-const express = require('express'); //Importación de libreria.
+// =============================================================
+// IMPORTS
+// =============================================================
+
+const express = require('express'); //Importación de framework.
 const router = express.Router(); //Es un miniservidor para las rutas relacionadas con teams.
 const db = require('../config/db'); //  Importa la conexion con la base de datos.
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcrypt'); // Importación de la encriptación.
+
+// ===================================================================
+// POST CREAR USUARIO
+// ===================================================================
 
 router.post('/', async(req, res) =>{
+
+    // Se reciben los siguientes datos por parte del usuario.
     const {
         id_club,
         user_name,
@@ -14,25 +24,31 @@ router.post('/', async(req, res) =>{
         telef,
         birth_date,
         password
-    }=req.body;
+    }=req.body; // Se guardan aqui.
 
-    if(!id_club || !user_name || !surename1 || !DNI || !birth_date || !password){
+    // Validación de los campos obligatorios.
+    if(!id_club || !user_name || !surename1 || !DNI || !birth_date || !password || !email || !telef) {
         return res.status(400).json({
             error: 'All fields are required'
         });
     }
 
     try{
-        //Comprobamos si el club existe.
-        const [clubresult]= await db.promise().query(
+
+        // Comprobamos si el club existe. En un futuro dependiendo de como se introduzca el usaurio 
+        // habrá que ver esto mejor.
+        const [club]= await db.promise().query(
             'Select id_club From club where id_club = ?',
             [id_club]
         );
 
-        if(clubresult.length === 0){
+        // Validación si no existe el club.
+        if(club.length === 0){
+
             return res.status(400).json({
                 error: 'Club not found'
             });
+
         }
 
         //Calculamos si es menor de edad.
@@ -40,12 +56,11 @@ router.post('/', async(req, res) =>{
         const age = new Date().getFullYear()- birth.getFullYear();
         const is_minor = age < 18 ;
 
-        //Hash the contraseña
-        const saltRounds = 10;
-        const passwordHash = await bcrypt.hash(password, saltRounds);
+        // Aquí se encripta la contraseña para no guardarla claramente.
+        const passwordHash = await bcrypt.hash(password, 10);
 
 
-        //Insertar usuario
+        //Insertar usuario y se guarda para la validación.
         const [result] = await db.promise().query(
             `INSERT INTO users
             (id_club, user_name, surename1, surename2, DNI, email, telef, birth_date, is_minor, passwrd_hash)
@@ -63,32 +78,46 @@ router.post('/', async(req, res) =>{
                 passwordHash
             ]
         );
+
+        // Validación del insert.
         res.status(201).json({
             message: 'User created succesfully',
             id_user: result.insertId
         })
 
-
+    // Manejo de errores.
     }catch(error){
+
         console.error(error);
 
-        //Errores con UNIQUE
+        //Errores con UNIQUE, del dni o email.
         if(error.code === 'ER_DUP_ENTRY'){
+
             return res.status(400).json({
                 error: 'User already exist (gmail, DNI or phone'
             });
+
         }
 
         res.status(500).json({
             error: "Error creating user"
         });
+
     }
 })
 
-router.get('/', (req, res) => {
-    const { club, team, role } = req.query; // Leer los parámetros
+// =================================================================
+// GET USERS CON FILTROS.
+// =================================================================
+router.get('/', async (req, res) => {
 
-    let sql = `
+    // Lee la información de los filtros.
+    const { club, team, role } = req.query; 
+
+    try{
+
+        // Consulta de sql.
+        let sql = `
         SELECT
             u.id_user,
             u.user_name,
@@ -109,154 +138,84 @@ router.get('/', (req, res) => {
         WHERE 1=1
     `;
 
+    // Se guardan en este array los posbles datos que nos interesan.
     const params = [];
 
     // Filtro por club
     if (club) {
+
         sql += ' AND u.id_club = ?';
         params.push(club);
+
     }
 
     // Filtro por equipo
     if (team) {
+
         sql += ' AND t.id_team = ?';
         params.push(team);
+
     }
 
     // Filtro por rol
     if (role) {
-        sql += `
-            AND (
-                r.rol = ? OR (rt.rol = ? AND t.id_club = u.id_club)
-            )
-        `;
+
+        sql += `AND (r.rol = ? OR (rt.rol = ? AND t.id_club = u.id_club))`;
         params.push(role, role);
+
     }
 
-    db.query(sql, params, (err, rows) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: 'Database error' });
+    // Pedimos la consulta y la guardamos en el array.
+    const [rows] = await db.promise().query(sql, params);
+
+    // Se genera una biblioteca.
+    const users = {};
+
+    // Recorre cada fila que viene de la base de datos.
+    rows.forEach(row => {
+
+        // Si el usuario no existe todavía.
+        if (!users[row.id_user]) {
+            // Creamos un usuario Solo una vez con arrays vacios para roles y equipos.
+            users[row.id_user] = {
+                id_user: row.id_user,
+                name: row.user_name,
+                email: row.email,
+                id_club: row.id_club,
+                global_roles: [],
+                teams: []
+            };
+
         }
 
-        const usersMap = {};
+        // Si tiene rol global.
+        if (row.global_role) {
+            // Lo metemos en el array y así tiene varios roles.
+            users[row.id_user].global_roles.push(row.global_role);
 
-        rows.forEach(row => {
-            if (!usersMap[row.id_user]) {
-                usersMap[row.id_user] = {
-                    id_user: row.id_user,
-                    user_name: row.user_name,
-                    surename1: row.surename1,
-                    surename2: row.surename2,
-                    email: row.email,
-                    id_club: row.id_club,
-                    global_roles: [],
-                    teams: []
-                };
-            }
-
-            // Solo agregar global_role si coincide con el filtro de rol (si se pasó)
-            if (row.global_role && (!role || row.global_role === role)) {
-                if (!usersMap[row.id_user].global_roles.includes(row.global_role)) {
-                    usersMap[row.id_user].global_roles.push(row.global_role);
-                }
-            }
-
-            // Solo agregar equipos si coincide con filtro de rol (si se pasó)
-            if (row.id_team && (!role || row.team_role === role)) {
-                const exists = usersMap[row.id_user].teams.some(t => t.id_team === row.id_team);
-                if (!exists) {
-                    usersMap[row.id_user].teams.push({
-                        id_team: row.id_team,
-                        category: row.team_category,
-                        role: row.team_role
-                    });
-                }
-            }
-        });
-
-        // Eliminar usuarios que no tengan roles ni equipos cuando se filtró por rol
-        let users = Object.values(usersMap);
-        if (role) {
-            users = users.filter(u => u.global_roles.length > 0 || u.teams.length > 0);
         }
 
-        res.json(users);
-    });
-});
-
-module.exports = router;
-
-
-    /*
-    if (id_club) {
-        //vemos si el club existe.
-        const clubSql = 'SELECT id_club FROM club WHERE id_club = ?';
-
-        db.query(clubSql, [id_club], (err, clubResult) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: 'Database error' });
-            }
-
-            // 2️⃣ Si el club no existe
-            if (clubResult.length === 0) {
-                return res.status(404).json({
-                    error: 'Club not found'
-                });
-            }
-            const usersSql = `
-                SELECT 
-                    id_user,
-                    id_club,
-                    user_name,
-                    surename1,
-                    surename2,
-                    DNI,
-                    email,
-                    telef,
-                    birth_date,
-                    is_minor
-                FROM users
-                WHERE id_club = ?
-            `;
-
-            db.query(usersSql, [id_club],(err, userResults)=>{
-                if(err){
-                    console.error(err);
-                    return res.status(500).json({error:'Database error'});
-                }
-
-                res.json(userResults);
+        // Si pertenece a un equipo
+        if (row.id_team) {
+            // Lo añadimos a los teams y así puede estar en varios equipos.
+            users[row.id_user].teams.push({
+                id_team: row.id_team,
+                category: row.category,
+                role: row.team_role
             });
-        });
-    }else{
-        const usersSql = `
-                SELECT 
-                    id_user,
-                    id_club,
-                    user_name,
-                    surename1,
-                    surename2,
-                    DNI,
-                    email,
-                    telef,
-                    birth_date,
-                    is_minor
-                FROM users
-            `;
-        db.query(usersSql, [id_club], (err, usersResult) => {
-                if (err) {
-                    console.error(err);
-                    return res.status(500).json({ error: 'Database error' });
-                }
 
-                res.json(usersResult);
+        }
+    });
+
+    // Lo transforma en un array y luego a json.
+    res.json(Object.values(users));
+
+    }catch (error){
+
+        console.error(error);
+        res.status(500).json({
+            error: 'Error fetching users'
         });
+
     }
-        
 });
-module.exports= router;*/
-
-
-
